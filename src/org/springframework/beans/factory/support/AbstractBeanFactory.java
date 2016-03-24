@@ -11,9 +11,11 @@ import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanIsNotAFactoryException;
 import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.FactoryBeanCircularReferenceException;
 import org.springframework.beans.factory.HierarchicalBeanFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
@@ -106,6 +108,7 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 		}
 
 		if (beanInstance instanceof FactoryBean) {
+			//factoryBean 이지만 이름이 &없는경우
 			if (!isFactoryDereference(name)) {
 				FactoryBean factory = (FactoryBean) beanInstance;
 				logger.debug("Bean with name '" + beanName + "' is a factory bean");
@@ -118,6 +121,7 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 				catch (Exception ex) {
 					throw new BeanCreationException("FactoryBean threw exception on object creation", ex);
 				}
+				
 				if (beanInstance == null) {
 					throw new FactoryBeanCircularReferenceException(
 					    "Factory bean '" + beanName + "' returned null object - " +
@@ -135,7 +139,21 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 	protected boolean isFactoryDereference(String name) {
 		return name.startsWith(FACTORY_BEAN_PREFIX);
 	}
-
+	
+	public RootBeanDefinition getMergedBeanDefinition(String beanName, boolean includingAncestors)
+		    throws BeansException {
+			try {
+				return getMergedBeanDefinition(beanName, getBeanDefinition(beanName));
+			}
+			catch (NoSuchBeanDefinitionException ex) {
+				if (includingAncestors && getParentBeanFactory() instanceof AbstractAutowireCapableBeanFactory) {
+					return ((AbstractAutowireCapableBeanFactory) getParentBeanFactory()).getMergedBeanDefinition(beanName, true);
+				}
+				else {
+					throw ex;
+				}
+			}
+		}
 
 	
 }
