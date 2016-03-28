@@ -1,8 +1,14 @@
 package org.springframework.util;
 
+import java.util.LinkedList;
+import java.util.List;
+
 public class StringUtils {
 	
-	//join ÇÏ°í ºñ½ÁÇÑ°Å °°À½
+	public static String arrayToCommaDelimitedString(Object[] arr) {
+		return arrayToDelimitedString(arr, ",");
+	}
+	//join ì´ë‘ ë¹„ìŠ·
 	public static String arrayToDelimitedString(Object[] arr, String delim) {
 		if (arr == null) {
 			return "null";
@@ -17,5 +23,35 @@ public class StringUtils {
 			return sb.toString();
 		}
 	}
+	
+	
+	
+	public static String[] commaDelimitedListToStringArray(String s) {
+		return delimitedListToStringArray(s, ",");
+	}
+	
+	//ë¬¸ì êµ¬ë¶„ì ì†ëŠ”ê±° ê°€ì§€ê³  ë°°ì—´ë£Œ  split??
+	public static String[] delimitedListToStringArray(String s, String delim) {
+		if (s == null) {
+			return new String[0];
+		}
+		if (delim == null) {
+			return new String[]{s};
+		}
+
+		List l = new LinkedList();
+		int pos = 0;
+		int delPos = 0;
+		while ((delPos = s.indexOf(delim, pos)) != -1) {
+			l.add(s.substring(pos, delPos));
+			pos = delPos + delim.length();
+		}
+		if (pos <= s.length()) {
+			l.add(s.substring(pos));
+		}
+
+		return (String[]) l.toArray(new String[l.size()]);
+	}
+	
 
 }
