@@ -47,7 +47,6 @@ public abstract class AbstractBeanDefinition implements BeanDefinition{
 		return lazyInit;
 	}
 	
-	//¿ÀÁ÷ ½Ì±ÛÅæ¿¡¼­¸¸
 	public void validate() throws BeanDefinitionValidationException {
 		if (this.lazyInit && !this.singleton) {
 			throw new BeanDefinitionValidationException("Lazy initialization is just applicable to singleton beans");

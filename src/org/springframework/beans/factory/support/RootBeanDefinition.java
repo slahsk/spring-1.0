@@ -36,6 +36,7 @@ public class RootBeanDefinition extends AbstractBeanDefinition{
 		super(null);
 		this.beanClass = beanClass;
 		setAutowireMode(autowireMode);
+		//자동 모드 체크
 		if (dependencyCheck && getResolvedAutowireMode() != AUTOWIRE_CONSTRUCTOR) {
 			setDependencyCheck(RootBeanDefinition.DEPENDENCY_CHECK_OBJECTS);
 		}
@@ -110,10 +111,12 @@ public class RootBeanDefinition extends AbstractBeanDefinition{
 	}
 	
 	public int getResolvedAutowireMode() {
+		//자동이면
 		if (this.autowireMode == AUTOWIRE_AUTODETECT) {
 			Constructor[] constructors = getBeanClass().getConstructors();
+			//생성자 개수 만큼
 			for (int i = 0; i < constructors.length; i++) {
-				//�����ڰ� ������
+				//기본 생성자가 있으면
 				if (constructors[i].getParameterTypes().length == 0) {
 					return AUTOWIRE_BY_TYPE;
 				}

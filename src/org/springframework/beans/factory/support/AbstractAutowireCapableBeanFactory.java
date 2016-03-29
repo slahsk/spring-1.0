@@ -43,6 +43,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		if (bd.getResolvedAutowireMode() == AUTOWIRE_CONSTRUCTOR) {
 			return autowireConstructor(beanClass.getName(), bd).getWrappedInstance();
 		} else {
+			//객체 생성
 			Object bean = BeanUtils.instantiateClass(beanClass);
 			populateBean(bean.getClass().getName(), bd, new BeanWrapperImpl(bean));
 			return bean;
@@ -62,15 +63,14 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 				Map.Entry entry = (Map.Entry) it.next();
 				int index = ((Integer) entry.getKey()).intValue();
 				if (index < 0) {
-					throw new BeanCreationException(mergedBeanDefinition.getResourceDescription(), beanName,
-							"Invalid constructor argument index: " + index);
+					throw new BeanCreationException(mergedBeanDefinition.getResourceDescription(), beanName,"Invalid constructor argument index: " + index);
 				}
 				if (index > minNrOfArgs) {
 					minNrOfArgs = index + 1;
 				}
 				String argName = "constructor argument with index " + index;
-				ConstructorArgumentValues.ValueHolder valueHolder = (ConstructorArgumentValues.ValueHolder) entry
-						.getValue();
+				ConstructorArgumentValues.ValueHolder valueHolder = (ConstructorArgumentValues.ValueHolder) entry.getValue();
+				
 				Object resolvedValue = resolveValueIfNecessary(beanName, mergedBeanDefinition, argName,valueHolder.getValue());
 				resolvedValues.addIndexedArgumentValue(index, resolvedValue, valueHolder.getType());
 			}
@@ -170,8 +170,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		return bw;
 	}
 
-	protected Object resolveValueIfNecessary(String beanName, RootBeanDefinition mergedBeanDefinition, String argName,
-			Object value) throws BeansException {
+	protected Object resolveValueIfNecessary(String beanName, RootBeanDefinition mergedBeanDefinition, String argName,Object value) throws BeansException {
 		if (value instanceof AbstractBeanDefinition) {
 			BeanDefinition bd = (BeanDefinition) value;
 			if (bd instanceof AbstractBeanDefinition) {
