@@ -66,13 +66,12 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 				mergedBeanDefinition = getMergedBeanDefinition(beanName, false);
 			}
 			catch (NoSuchBeanDefinitionException ex) {
-				// not found -> check parent
 				if (this.parentBeanFactory != null) {
 					return this.parentBeanFactory.getBean(name);
 				}
 				throw ex;
 			}
-			// create bean instance
+			
 			if (mergedBeanDefinition.isSingleton()) {
 				synchronized (this.singletonCache) {
 					// re-check singleton cache within synchronized block

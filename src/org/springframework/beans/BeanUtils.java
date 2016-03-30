@@ -37,4 +37,18 @@ public abstract class BeanUtils {
 		    Float[].class.equals(clazz) || Double[].class.equals(clazz);
 	}
 	
+	//같은 타입이지 검사
+	public static boolean isAssignable(Class type, Object value) {
+		return (type.isInstance(value) ||
+		    (!type.isPrimitive() && value == null) ||
+		    (type.equals(boolean.class) && value instanceof Boolean) ||
+		    (type.equals(byte.class) && value instanceof Byte) ||
+		    (type.equals(char.class) && value instanceof Character) ||
+		    (type.equals(short.class) && value instanceof Short) ||
+		    (type.equals(int.class) && value instanceof Integer) ||
+		    (type.equals(long.class) && value instanceof Long) ||
+		    (type.equals(float.class) && value instanceof Float) ||
+		    (type.equals(double.class) && value instanceof Double));
+	}
+	
 }
