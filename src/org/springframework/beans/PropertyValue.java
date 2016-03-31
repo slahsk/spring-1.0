@@ -32,7 +32,6 @@ public class PropertyValue {
 			return false;
 		}
 		PropertyValue otherPv = (PropertyValue) other;
-		//°ªºñ±³
 		return (this.name.equals(otherPv.name) &&
 				((this.value == null && otherPv.value == null) || this.value.equals(otherPv.value)));
 	}

@@ -41,6 +41,7 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 	private final Map singletonCache = Collections.synchronizedMap(new HashMap());
 	
 	public AbstractBeanFactory() {
+		//BeanFactory 클레스는 의존주입 제외
 		ignoreDependencyType(BeanFactory.class);
 	}
 	
@@ -196,10 +197,12 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 			throw new NoSuchBeanDefinitionException(name, "Cannot get bean with null name");
 		}
 		
+		//FACTORY_BEAN_PREFIX 값 제거
 		if (name.startsWith(FACTORY_BEAN_PREFIX)) {
 			name = name.substring(FACTORY_BEAN_PREFIX.length());
 		}
 		
+		//alias 되어 있는지 확인
 		String canonicalName = (String) this.aliasMap.get(name);
 		return canonicalName != null ? canonicalName : name;
 	}
@@ -207,16 +210,21 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 	
 	protected Object getObjectForSharedInstance(String name, Object beanInstance) {
 		String beanName = transformedBeanName(name);
-
+		
+		//isFactoryDereference 이름 검사 & 포함 되어 있으면 TRUE
+		//FactoryBean 이 아니면 객체를 생성할수 없다
 		if (isFactoryDereference(name) && !(beanInstance instanceof FactoryBean)) {
 			throw new BeanIsNotAFactoryException(beanName, beanInstance);
 		}
-
+		
+		//FactoryBean 검사
 		if (beanInstance instanceof FactoryBean) {
+			//이름에 & 없으면
 			if (!isFactoryDereference(name)) {
 				FactoryBean factory = (FactoryBean) beanInstance;
 				logger.debug("Bean with name '" + beanName + "' is a factory bean");
 				try {
+					//객체 가져오기
 					beanInstance = factory.getObject();
 				}
 				catch (BeansException ex) {

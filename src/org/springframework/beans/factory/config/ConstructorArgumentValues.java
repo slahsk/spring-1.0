@@ -8,7 +8,10 @@ import java.util.Map;
 import java.util.Set;
 
 public class ConstructorArgumentValues {
+	//숫자로 조회하는 맵
 	private Map indexedArgumentValues = new HashMap();
+	
+	
 	private Set genericArgumentValues = new HashSet();
 	
 	public void addIndexedArgumentValue(int index, Object value) {
@@ -19,6 +22,7 @@ public class ConstructorArgumentValues {
 		this.indexedArgumentValues.put(new Integer(index), new ValueHolder(value, type));
 	}
 	
+	//requiredType 은 map 에서 가져온 ValueHolder name 하고 같은지 검사하기 위해 사용
 	public ValueHolder getIndexedArgumentValue(int index, Class requiredType) {
 		ValueHolder valueHolder = (ValueHolder) this.indexedArgumentValues.get(new Integer(index));
 		if (valueHolder != null) {

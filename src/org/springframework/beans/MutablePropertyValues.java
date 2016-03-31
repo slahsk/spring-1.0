@@ -20,7 +20,6 @@ public class MutablePropertyValues implements PropertyValues{
 		if (other != null) {
 			PropertyValue[] pvs = other.getPropertyValues();
 			this.propertyValuesList = new ArrayList(pvs.length);
-			//array -> list
 			for (int i = 0; i < pvs.length; i++) {
 				addPropertyValue(new PropertyValue(pvs[i].getName(), pvs[i].getValue()));
 			}
@@ -40,7 +39,6 @@ public class MutablePropertyValues implements PropertyValues{
 	public void addPropertyValue(PropertyValue pv) {
 		for (int i = 0; i < this.propertyValuesList.size(); i++) {
 			PropertyValue currentPv = (PropertyValue) this.propertyValuesList.get(i);
-			//같은 이름 있으면 set 없으면 add
 			if (currentPv.getName().equals(pv.getName())) {
 				this.propertyValuesList.set(i, pv);
 				return;
@@ -84,7 +82,6 @@ public class MutablePropertyValues implements PropertyValues{
 	}
 	
 	
-	//같음 이름 객체를 변경
 	public PropertyValues changesSince(PropertyValues old) {
 		MutablePropertyValues changes = new MutablePropertyValues();
 		if (old == this)
@@ -94,13 +91,10 @@ public class MutablePropertyValues implements PropertyValues{
 			PropertyValue newPv = (PropertyValue) this.propertyValuesList.get(i);
 			PropertyValue pvOld = old.getPropertyValue(newPv.getName());
 			
-			//old 에 없어도
 			if (pvOld == null) {
 				changes.addPropertyValue(newPv);
 			}
-			//old 에 있지만  다른 객체라면 
 			else if (!pvOld.equals(newPv)) {
-				// It's changed
 				changes.addPropertyValue(newPv);
 			}
 		}

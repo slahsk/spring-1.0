@@ -1,5 +1,8 @@
 package org.springframework.beans;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
 public abstract class BeanUtils {
 	
 	//객체 생성
@@ -14,6 +17,27 @@ public abstract class BeanUtils {
 		catch (IllegalAccessException ex) {
 			throw new FatalBeanException("Could not instantiate class [" + clazz.getName() +
 																	 "]; has class definition changed? Is there a public no-arg constructor?", ex);
+		}
+	}
+	
+	public static Object instantiateClass(Constructor constructor, Object[] arguments) throws BeansException {
+		try {
+			return constructor.newInstance(arguments);
+		}
+		catch (IllegalArgumentException ex) {
+			throw new FatalBeanException("Illegal arguments when trying to instantiate constructor: " + constructor, ex);
+		}
+		catch (InstantiationException ex) {
+			throw new FatalBeanException("Could not instantiate class [" + constructor.getDeclaringClass().getName() +
+			                             "]; is it an interface or an abstract class?", ex);
+		}
+		catch (IllegalAccessException ex) {
+			throw new FatalBeanException("Could not instantiate class [" + constructor.getDeclaringClass().getName() +
+			                             "]; has class definition changed? Is there a public constructor?", ex);
+		}
+		catch (InvocationTargetException ex) {
+			throw new FatalBeanException("Could not instantiate class [" + constructor.getDeclaringClass().getName() +
+			                             "]; constructor threw exception", ex.getTargetException());
 		}
 	}
 	
@@ -37,7 +61,6 @@ public abstract class BeanUtils {
 		    Float[].class.equals(clazz) || Double[].class.equals(clazz);
 	}
 	
-	//같은 타입이지 검사
 	public static boolean isAssignable(Class type, Object value) {
 		return (type.isInstance(value) ||
 		    (!type.isPrimitive() && value == null) ||
@@ -50,5 +73,6 @@ public abstract class BeanUtils {
 		    (type.equals(float.class) && value instanceof Float) ||
 		    (type.equals(double.class) && value instanceof Double));
 	}
+	
 	
 }
