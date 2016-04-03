@@ -1,5 +1,7 @@
 package org.springframework.util;
 
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -53,5 +55,24 @@ public class StringUtils {
 		return (String[]) l.toArray(new String[l.size()]);
 	}
 	
-
+	public static String collectionToCommaDelimitedString(Collection c) {
+		return collectionToDelimitedString(c, ",");
+	}
+	
+	//Collection 객체 , 구분해서 하나의 스트링으로 변화 시키기
+	public static String collectionToDelimitedString(Collection c, String delim) {
+		if (c == null) {
+			return "null";
+		}
+		StringBuffer sb = new StringBuffer();
+		Iterator itr = c.iterator();
+		int i = 0;
+		while (itr.hasNext()) {
+			if (i++ > 0) {
+				sb.append(delim);
+			}
+			sb.append(itr.next());
+		}
+		return sb.toString();
+	}
 }

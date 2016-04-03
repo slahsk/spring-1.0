@@ -47,6 +47,7 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 	
 	public AbstractBeanFactory(BeanFactory parentBeanFactory) {
 		this();
+		//부모
 		this.parentBeanFactory = parentBeanFactory;
 	}
 	
@@ -59,9 +60,10 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 			if (logger.isDebugEnabled()) {
 				logger.debug("Returning cached instance of singleton bean '" + beanName + "'");
 			}
+			//FactoryBean 이면 거기에서 가져오기 아니면 그냥 리턴 
 			return getObjectForSharedInstance(name, sharedInstance);
 		}
-		else {
+		else {//싱글톤 맵에 없으면
 			RootBeanDefinition mergedBeanDefinition = null;
 			try {
 				mergedBeanDefinition = getMergedBeanDefinition(beanName, false);
@@ -75,7 +77,6 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 			
 			if (mergedBeanDefinition.isSingleton()) {
 				synchronized (this.singletonCache) {
-					// re-check singleton cache within synchronized block
 					sharedInstance = this.singletonCache.get(beanName);
 					if (sharedInstance == null) {
 						logger.info("Creating shared instance of singleton bean '" + beanName + "'");
@@ -217,7 +218,8 @@ public abstract class AbstractBeanFactory implements ConfigurableBeanFactory, Hi
 			throw new BeanIsNotAFactoryException(beanName, beanInstance);
 		}
 		
-		//FactoryBean 검사
+		//FactoryBean 이면 FactoryBean 에서 객체 가져오기
+		//FactoryBean 은 사용자가 정의 하기 때문에 
 		if (beanInstance instanceof FactoryBean) {
 			//이름에 & 없으면
 			if (!isFactoryDereference(name)) {
