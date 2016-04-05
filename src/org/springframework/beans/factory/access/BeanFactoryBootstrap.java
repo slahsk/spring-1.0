@@ -62,4 +62,8 @@ public class BeanFactoryBootstrap {
 			throw new BootstrapException("Failed to bootstrap bean factory", ex);
 		}
 	}
+	
+	public BeanFactory getBeanFactory() {
+		return bootstrapFactory;
+	}
 }

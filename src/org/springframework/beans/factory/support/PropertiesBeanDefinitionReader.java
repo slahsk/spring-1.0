@@ -13,7 +13,10 @@ import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.MutablePropertyValues;
+import org.springframework.beans.PropertyValue;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
+import org.springframework.beans.factory.config.RuntimeBeanReference;
 import org.springframework.core.io.Resource;
 
 public class PropertiesBeanDefinitionReader extends AbstractBeanDefinitionReader{
@@ -125,6 +128,93 @@ public class PropertiesBeanDefinitionReader extends AbstractBeanDefinitionReader
 		}
 
 		return beanCount;
+	}
+	
+	protected void registerBeanDefinition(String beanName, Map m, String prefix, String resourceDescription)
+			throws BeansException {
+		String className = null;
+		String parent = null;
+		boolean singleton = true;
+		boolean lazyInit = false;
+
+		MutablePropertyValues pvs = new MutablePropertyValues();
+		Set keys = m.keySet();
+		Iterator itr = keys.iterator();
+		while (itr.hasNext()) {
+			String key = (String) itr.next();
+			if (key.startsWith(prefix + SEPARATOR)) {
+				String property = key.substring(prefix.length() + SEPARATOR.length());
+				if (property.equals(CLASS_KEY)) {
+					className = (String) m.get(key);
+				}
+				else if (property.equals(SINGLETON_KEY)) {
+					String val = (String) m.get(key);
+					singleton = (val == null) || val.equals(TRUE_VALUE);
+				}
+				else if (property.equals(LAZY_INIT_KEY)) {
+					String val = (String) m.get(key);
+					lazyInit = val.equals(TRUE_VALUE);
+				}
+				else if (property.equals(PARENT_KEY)) {
+					parent = (String) m.get(key);
+				}
+				else if (property.endsWith(REF_SUFFIX)) {
+					property = property.substring(0, property.length() - REF_SUFFIX.length());
+					String ref = (String) m.get(key);
+
+					Object val = new RuntimeBeanReference(ref);
+					pvs.addPropertyValue(new PropertyValue(property, val));
+				}
+				else{
+					Object val = m.get(key);
+					if (val instanceof String) {
+						String strVal = (String) val;
+						if (strVal.startsWith(REF_PREFIX)) {
+							String targetName = strVal.substring(1);
+							if (targetName.startsWith(REF_PREFIX)) {
+								val = targetName;
+							}
+							else {
+								val = new RuntimeBeanReference(targetName);
+							}
+						}
+					}
+					pvs.addPropertyValue(new PropertyValue(property, val));
+				}
+			}
+		}
+
+		if (logger.isDebugEnabled()) {
+			logger.debug(pvs.toString());
+		}
+
+		if (parent == null) {
+			parent = this.defaultParentBean;
+		}
+
+		if (className == null && parent == null) {
+			throw new BeanDefinitionStoreException(resourceDescription, beanName,
+																						 "Either 'class' or 'parent' is required");
+		}
+
+		try {
+			AbstractBeanDefinition beanDefinition = null;
+			//className 없으면 class 정보 불러오기
+			if (className != null) {
+				Class clazz = Class.forName(className, true, getBeanClassLoader());
+				beanDefinition = new RootBeanDefinition(clazz, pvs);
+			}
+			else {
+				beanDefinition = new ChildBeanDefinition(parent, pvs);
+			}
+
+			beanDefinition.setSingleton(singleton);
+			beanDefinition.setLazyInit(lazyInit);
+			getBeanFactory().registerBeanDefinition(beanName, beanDefinition);
+		}
+		catch (ClassNotFoundException ex) {
+			throw new BeanDefinitionStoreException(resourceDescription, beanName, "Class [" + className + "] not found", ex);
+		}
 	}
 
 }
