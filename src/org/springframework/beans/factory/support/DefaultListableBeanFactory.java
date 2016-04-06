@@ -89,8 +89,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				try {
 					FactoryBean factory = (FactoryBean) getBean(FACTORY_BEAN_PREFIX + factoryNames[i]);
 					Class objectType = factory.getObjectType();
-					if ((objectType == null && factory.isSingleton()) ||
-							((factory.isSingleton() || includePrototypes) &&
+					
+					//includePrototypes true 이면 싱글톤갑시 false 라도 빈은 가져오게 한다.
+					if ((objectType == null && factory.isSingleton()) || ((factory.isSingleton() || includePrototypes) &&
 							objectType != null && type.isAssignableFrom(objectType))) {
 						Object createdObject = getBean(factoryNames[i]);
 						if (type.isInstance(createdObject)) {
