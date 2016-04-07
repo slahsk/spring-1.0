@@ -4,12 +4,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -20,15 +24,18 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.HierarchicalMessageSource;
 import org.springframework.context.MessageSource;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.context.NoSuchMessageException;
 import org.springframework.context.event.ApplicationEventMulticaster;
 import org.springframework.context.event.ApplicationEventMulticasterImpl;
 import org.springframework.context.event.ContextClosedEvent;
+import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 
-public class AbstractApplicationContext extends DefaultResourceLoader implements ConfigurableApplicationContext{
+public abstract class AbstractApplicationContext extends DefaultResourceLoader implements ConfigurableApplicationContext{
 
 	public static final String MESSAGE_SOURCE_BEAN_NAME = "messageSource";
 	
@@ -95,19 +102,17 @@ public class AbstractApplicationContext extends DefaultResourceLoader implements
 	
 	public void refresh() throws BeansException {
 		this.startupTime = System.currentTimeMillis();
-
-		// tell subclass to refresh the internal bean factory
+		
+		//하위클레스에서 구현
 		refreshBeanFactory();
 		ConfigurableListableBeanFactory beanFactory = getBeanFactory();
 
-		// configure the bean factory with context semantics
 		beanFactory.registerCustomEditor(Resource.class, new ContextResourceEditor(this));
 		beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));
 		beanFactory.ignoreDependencyType(ResourceLoader.class);
 		beanFactory.ignoreDependencyType(ApplicationContext.class);
 		postProcessBeanFactory(beanFactory);
 
-		// invoke factory processors registered with the context instance
 		for (Iterator it = getBeanFactoryPostProcessors().iterator(); it.hasNext();) {
 			BeanFactoryPostProcessor factoryProcessor = (BeanFactoryPostProcessor) it.next();
 			factoryProcessor.postProcessBeanFactory(beanFactory);
@@ -120,25 +125,18 @@ public class AbstractApplicationContext extends DefaultResourceLoader implements
 			logger.info(getBeanDefinitionCount() + " beans defined in ApplicationContext [" + getDisplayName() + "]");
 		}
 
-		// invoke factory processors registered as beans in the context
 		invokeBeanFactoryPostProcessors();
 
-		// register bean processor that intercept bean creation
 		registerBeanPostProcessors();
 
-		// initialize message source for this context
 		initMessageSource();
 
-		// initialize other special beans in specific context subclasses
 		onRefresh();
 
-		// check for listener beans and register them
 		refreshListeners();
 
-		// instantiate singletons this late to allow them to access the message source
 		beanFactory.preInstantiateSingletons();
 
-		// last step: publish respective event
 		publishEvent(new ContextRefreshedEvent(this));
 	}
 	
@@ -216,13 +214,85 @@ public class AbstractApplicationContext extends DefaultResourceLoader implements
 	public void close() {
 		logger.info("Closing application context [" + getDisplayName() + "]");
 
-		// destroy all cached singletons in this context,
-		// invoking DisposableBean.destroy and/or "destroy-method"
 		getBeanFactory().destroySingletons();
 
-		// publish respective event
 		publishEvent(new ContextClosedEvent(this));
 	}
+	
+	public Object getBean(String name) throws BeansException {
+		return getBeanFactory().getBean(name);
+	}
 
+	public Object getBean(String name, Class requiredType) throws BeansException {
+		return getBeanFactory().getBean(name, requiredType);
+	}
+
+	public boolean containsBean(String name) {
+		return getBeanFactory().containsBean(name);
+	}
+
+	public boolean isSingleton(String name) throws NoSuchBeanDefinitionException {
+		return getBeanFactory().isSingleton(name);
+	}
+
+	public String[] getAliases(String name) throws NoSuchBeanDefinitionException {
+		return getBeanFactory().getAliases(name);
+	}
+	
+	
+	public int getBeanDefinitionCount() {
+		return getBeanFactory().getBeanDefinitionCount();
+	}
+
+	public String[] getBeanDefinitionNames() {
+		return getBeanFactory().getBeanDefinitionNames();
+	}
+
+	public String[] getBeanDefinitionNames(Class type) {
+		return getBeanFactory().getBeanDefinitionNames(type);
+	}
+
+	public boolean containsBeanDefinition(String name) {
+		return getBeanFactory().containsBeanDefinition(name);
+	}
+
+	public Map getBeansOfType(Class type, boolean includePrototypes, boolean includeFactoryBeans) throws BeansException {
+		return getBeanFactory().getBeansOfType(type, includePrototypes, includeFactoryBeans);
+	}
+	
+	public BeanFactory getParentBeanFactory() {
+		return getParent();
+	}
+	
+	public String getMessage(String code, Object args[], String defaultMessage, Locale locale) {
+		return this.messageSource.getMessage(code, args, defaultMessage, locale);
+	}
+
+	public String getMessage(String code, Object args[], Locale locale) throws NoSuchMessageException {
+		return this.messageSource.getMessage(code, args, locale);
+	}
+
+	public String getMessage(MessageSourceResolvable resolvable, Locale locale) throws NoSuchMessageException {
+		return this.messageSource.getMessage(resolvable, locale);
+	}
+
+	
+	public String toString() {
+		StringBuffer sb = new StringBuffer(getClass().getName());
+		sb.append(": ");
+		sb.append("displayName=[").append(this.displayName).append("]; ");
+		sb.append("startup date=[").append(new Date(this.startupTime)).append("]; ");
+		if (this.parent == null) {
+			sb.append("root of ApplicationContext hierarchy");
+		}
+		else {
+			sb.append("parent=[").append(this.parent).append(']');
+		}
+		return sb.toString();
+	}
+
+	protected abstract void refreshBeanFactory() throws BeansException;
+
+	public abstract ConfigurableListableBeanFactory getBeanFactory();
 
 }
