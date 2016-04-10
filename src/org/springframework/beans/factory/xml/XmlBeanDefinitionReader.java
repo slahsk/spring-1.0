@@ -50,6 +50,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader{
 		this.parserClass = parserClass;
 	}
 	
+	//resource(xml) 객체에서 inputStream 으로 받아서 Document 객체로 변화 시켜서 beanFactory 에  등록 시킨다
 	public void loadBeanDefinitions(Resource resource) throws BeansException {
 		if (resource == null) {
 			throw new BeanDefinitionStoreException("Resource cannot be null: expected an XML file");
@@ -99,9 +100,6 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader{
 	
 	private static class BeansErrorHandler implements ErrorHandler {
 
-		/**
-		 * We can't use the enclosing class' logger as it's protected and inherited.
-		 */
 		private final static Log logger = LogFactory.getLog(XmlBeanFactory.class);
 
 		public void error(SAXParseException ex) throws SAXException {

@@ -9,7 +9,7 @@ import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextException;
 
-public class AbstractXmlApplicationContext extends AbstractApplicationContext{
+public abstract class AbstractXmlApplicationContext extends AbstractApplicationContext{
 	
 	private ConfigurableListableBeanFactory beanFactory;
 	
@@ -23,6 +23,8 @@ public class AbstractXmlApplicationContext extends AbstractApplicationContext{
 	protected void refreshBeanFactory() throws BeansException {
 		try {
 			DefaultListableBeanFactory beanFactory = createBeanFactory();
+			//beanFactory 등록
+			//xml 파싱하는 객체 생성
 			XmlBeanDefinitionReader beanDefinitionReader = new XmlBeanDefinitionReader(beanFactory);
 			beanDefinitionReader.setEntityResolver(new ResourceEntityResolver(this));
 			initBeanDefinitionReader(beanDefinitionReader);
@@ -33,9 +35,31 @@ public class AbstractXmlApplicationContext extends AbstractApplicationContext{
 			}
 		}
 		catch (IOException ex) {
-			throw new ApplicationContextException("I/O error parsing XML document for application context [" +
-			                                      getDisplayName() + "]", ex);
+			throw new ApplicationContextException("I/O error parsing XML document for application context [" + getDisplayName() + "]", ex);
 		} 
 	}
+	
+	protected DefaultListableBeanFactory createBeanFactory() {
+		return new DefaultListableBeanFactory(getParent());
+	}
+
+	public ConfigurableListableBeanFactory getBeanFactory() {
+		return beanFactory;
+	}
+	
+	protected void initBeanDefinitionReader(XmlBeanDefinitionReader beanDefinitionReader) {
+	}
+	
+	protected void loadBeanDefinitions(XmlBeanDefinitionReader reader) throws BeansException, IOException {
+		String[] configLocations = getConfigLocations();
+		if (configLocations != null) {
+			for (int i = 0; i < configLocations.length; i++) {
+				//xml 에 등록 되어있는 bean 등록
+				reader.loadBeanDefinitions(getResource(configLocations[i]));
+			}
+		}
+	}
+	
+	protected abstract String[] getConfigLocations();
 
 }
