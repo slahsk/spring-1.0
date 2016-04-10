@@ -4,19 +4,32 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.MutablePropertyValues;
+import org.springframework.beans.PropertyValue;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
+import org.springframework.beans.factory.config.ConstructorArgumentValues;
+import org.springframework.beans.factory.config.RuntimeBeanReference;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.support.ChildBeanDefinition;
+import org.springframework.beans.factory.support.ManagedList;
+import org.springframework.beans.factory.support.ManagedMap;
+import org.springframework.beans.factory.support.ManagedSet;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.core.io.Resource;
 import org.springframework.util.StringUtils;
+import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.w3c.dom.Text;
 
 public class DefaultXmlBeanDefinitionParser implements XmlBeanDefinitionParser {
 
@@ -137,10 +150,12 @@ public class DefaultXmlBeanDefinitionParser implements XmlBeanDefinitionParser {
 	protected void loadBeanDefinition(Element ele) {
 		//bean id
 		String id = ele.getAttribute(ID_ATTRIBUTE);
+		
 		//bean name
 		String nameAttr = ele.getAttribute(NAME_ATTRIBUTE);
 		List aliases = new ArrayList();
 		if (nameAttr != null && !"".equals(nameAttr)) {
+			//문자열 토큰으로 자르기
 			String[] nameArr = StringUtils.tokenizeToStringArray(nameAttr, BEAN_NAME_DELIMITERS, true, true);
 			aliases.addAll(Arrays.asList(nameArr));
 		}
@@ -149,7 +164,8 @@ public class DefaultXmlBeanDefinitionParser implements XmlBeanDefinitionParser {
 			id = (String) aliases.remove(0);
 			logger.debug("No XML 'id' specified - using '" + id + "' as ID and " + aliases + " as aliases");
 		}
-
+	
+		//xml 파싱하여 bean 으로 만들기
 		AbstractBeanDefinition beanDefinition = parseBeanDefinition(ele, id);
 
 		if (id == null || "".equals(id)) {
@@ -168,6 +184,355 @@ public class DefaultXmlBeanDefinitionParser implements XmlBeanDefinitionParser {
 		for (Iterator it = aliases.iterator(); it.hasNext();) {
 			this.beanFactory.registerAlias(id, (String) it.next());
 		}
+	}
+	
+	protected AbstractBeanDefinition parseBeanDefinition(Element ele, String beanName) {
+		String className = null;
+		try {
+			if (ele.hasAttribute(CLASS_ATTRIBUTE)) {
+				className = ele.getAttribute(CLASS_ATTRIBUTE);
+			}
+			
+			String parent = null;
+			
+			//부모
+			if (ele.hasAttribute(PARENT_ATTRIBUTE)) {
+				parent = ele.getAttribute(PARENT_ATTRIBUTE);
+			}
+			
+			if (className == null && parent == null) {
+				throw new BeanDefinitionStoreException(this.resource, beanName, "Either 'class' or 'parent' is required");
+			}
+
+			AbstractBeanDefinition bd = null;
+			MutablePropertyValues pvs = getPropertyValueSubElements(beanName, ele);
+
+			if (className != null) {
+				ConstructorArgumentValues cargs = getConstructorArgSubElements(beanName, ele);
+				RootBeanDefinition rbd = null;
+
+				if (this.beanClassLoader != null) {
+					Class clazz = Class.forName(className, true, this.beanClassLoader);
+					rbd = new RootBeanDefinition(clazz, cargs, pvs);
+				}
+				else {
+					rbd = new RootBeanDefinition(className, cargs, pvs);
+				}
+
+				if (ele.hasAttribute(DEPENDS_ON_ATTRIBUTE)) {
+					String dependsOn = ele.getAttribute(DEPENDS_ON_ATTRIBUTE);
+					rbd.setDependsOn(StringUtils.tokenizeToStringArray(dependsOn, BEAN_NAME_DELIMITERS, true, true));
+				}
+
+				String dependencyCheck = ele.getAttribute(DEPENDENCY_CHECK_ATTRIBUTE);
+				if (DEFAULT_VALUE.equals(dependencyCheck)) {
+					dependencyCheck = this.defaultDependencyCheck;
+				}
+				rbd.setDependencyCheck(getDependencyCheck(dependencyCheck));
+
+				String autowire = ele.getAttribute(AUTOWIRE_ATTRIBUTE);
+				if (DEFAULT_VALUE.equals(autowire)) {
+					autowire = this.defaultAutowire;
+				}
+				rbd.setAutowireMode(getAutowireMode(autowire));
+
+				String initMethodName = ele.getAttribute(INIT_METHOD_ATTRIBUTE);
+				if (!initMethodName.equals("")) {
+					rbd.setInitMethodName(initMethodName);
+				}
+				String destroyMethodName = ele.getAttribute(DESTROY_METHOD_ATTRIBUTE);
+				if (!destroyMethodName.equals("")) {
+					rbd.setDestroyMethodName(destroyMethodName);
+				}
+
+				bd = rbd;
+			}
+			else {
+				bd = new ChildBeanDefinition(parent, pvs);
+			}
+
+			if (ele.hasAttribute(SINGLETON_ATTRIBUTE)) {
+				bd.setSingleton(TRUE_VALUE.equals(ele.getAttribute(SINGLETON_ATTRIBUTE)));
+			}
+
+			String lazyInit = ele.getAttribute(LAZY_INIT_ATTRIBUTE);
+			if (DEFAULT_VALUE.equals(lazyInit) && bd.isSingleton()) {
+				lazyInit = this.defaultLazyInit;
+			}
+			bd.setLazyInit(TRUE_VALUE.equals(lazyInit));
+
+			bd.setResourceDescription(this.resource.getDescription());
+
+			return bd;
+		}
+		catch (ClassNotFoundException ex) {
+			throw new BeanDefinitionStoreException(this.resource, beanName,
+																						 "Bean class [" + className + "] not found", ex);
+		}
+		catch (NoClassDefFoundError err) {
+			throw new BeanDefinitionStoreException(this.resource, beanName,
+																						 "Class that bean class [" + className + "] depends on not found", err);
+		}
+	}
+	
+	//xml 에 사용자가 정의 한 생성자 의존 주입 처리
+	protected ConstructorArgumentValues getConstructorArgSubElements(String beanName, Element beanEle)
+			throws ClassNotFoundException {
+		NodeList nl = beanEle.getChildNodes();
+		ConstructorArgumentValues cargs = new ConstructorArgumentValues();
+		for (int i = 0; i < nl.getLength(); i++) {
+			Node node = nl.item(i);
+			if (node instanceof Element && CONSTRUCTOR_ARG_ELEMENT.equals(node.getNodeName())) {
+				parseConstructorArgElement(beanName, cargs, (Element) node);
+			}
+		}
+		return cargs;
+	}
+	
+	//xml 에 사용자가 정의 한 속성 의존 주입 처리
+	protected MutablePropertyValues getPropertyValueSubElements(String beanName, Element beanEle) {
+		NodeList nl = beanEle.getChildNodes();
+		MutablePropertyValues pvs = new MutablePropertyValues();
+		for (int i = 0; i < nl.getLength(); i++) {
+			Node node = nl.item(i);
+			if (node instanceof Element && PROPERTY_ELEMENT.equals(node.getNodeName())) {
+				parsePropertyElement(beanName, pvs, (Element) node);
+			}
+		}
+		return pvs;
+	}
+	
+	protected void parseConstructorArgElement(String beanName, ConstructorArgumentValues cargs, Element ele)
+			throws DOMException, ClassNotFoundException {
+		Object val = getPropertyValue(ele, beanName);
+		String indexAttr = ele.getAttribute(INDEX_ATTRIBUTE);
+		String typeAttr = ele.getAttribute(TYPE_ATTRIBUTE);
+		//index 또는 type 으로 관리 한다.
+		if (!"".equals(indexAttr)) {
+			try {
+				int index = Integer.parseInt(indexAttr);
+				if (index < 0) {
+					throw new BeanDefinitionStoreException(this.resource, beanName, "'index' cannot be lower than 0");
+				}
+				if (!"".equals(typeAttr)) {
+					cargs.addIndexedArgumentValue(index, val, typeAttr);
+				}
+				else {
+					cargs.addIndexedArgumentValue(index, val);
+				}
+			}
+			catch (NumberFormatException ex) {
+				throw new BeanDefinitionStoreException(this.resource, beanName,
+																							 "Attribute 'index' of tag 'constructor-arg' must be an integer");
+			}
+		}
+		else {
+			if (!"".equals(typeAttr)) {
+				cargs.addGenericArgumentValue(val, typeAttr);
+			}
+			else {
+				cargs.addGenericArgumentValue(val);
+			}
+		}
+	}
+	
+	//xml 작성한 문자 속성을 객체로 변경해서 가져오기
+	protected void parsePropertyElement(String beanName, MutablePropertyValues pvs, Element ele)
+			throws DOMException {
+		String propertyName = ele.getAttribute(NAME_ATTRIBUTE);
+		//이름 필수
+		if ("".equals(propertyName)) {
+			throw new BeanDefinitionStoreException(this.resource, beanName,"Tag 'property' must have a 'name' attribute");
+		}
+		Object val = getPropertyValue(ele, beanName);
+		pvs.addPropertyValue(new PropertyValue(propertyName, val));
+	}
+	
+	protected Object getPropertyValue(Element ele, String beanName) {
+		NodeList nl = ele.getChildNodes();
+		Element valueRefOrCollectionElement = null;
+		
+		for (int i = 0; i < nl.getLength(); i++) {
+			if (nl.item(i) instanceof Element) {
+				Element candidateEle = (Element) nl.item(i);
+				//description 생략 하기
+				if (DESCRIPTION_ELEMENT.equals(candidateEle.getTagName())) {
+				}
+				else {
+					valueRefOrCollectionElement = candidateEle;
+				}
+			}
+		}
+		
+		if (valueRefOrCollectionElement == null) {
+			throw new BeanDefinitionStoreException(this.resource, beanName,"<property> element must have a subelement like 'value' or 'ref'");
+		}
+		
+		return parsePropertySubelement(valueRefOrCollectionElement, beanName);
+	}
+	
+	//<property></property> 속성 값을 객체로변화 시키기
+	protected Object parsePropertySubelement(Element ele, String beanName) {
+		//<bean><bean></bean></bean>
+		if (ele.getTagName().equals(BEAN_ELEMENT)) {
+			return parseBeanDefinition(ele, "(inner bean definition)");
+		}//<bean><ref></ref></bean>
+		else if (ele.getTagName().equals(REF_ELEMENT)) {
+			String beanRef = ele.getAttribute(BEAN_REF_ATTRIBUTE);
+			if ("".equals(beanRef)) {
+				beanRef = ele.getAttribute(LOCAL_REF_ATTRIBUTE);
+				if ("".equals(beanRef)) {
+					throw new BeanDefinitionStoreException(this.resource, beanName,
+																								 "Either 'bean' or 'local' is required for a reference");
+				}
+			}
+			return new RuntimeBeanReference(beanRef);
+		}
+		else if (ele.getTagName().equals(IDREF_ELEMENT)) {
+			String beanRef = ele.getAttribute(BEAN_REF_ATTRIBUTE);
+			if ("".equals(beanRef)) {
+				beanRef = ele.getAttribute(LOCAL_REF_ATTRIBUTE);
+				if ("".equals(beanRef)) {
+					throw new BeanDefinitionStoreException(this.resource, beanName,
+																								 "Either 'bean' or 'local' is required for an idref");
+				}
+			}
+			return beanRef;
+		}
+		else if (ele.getTagName().equals(LIST_ELEMENT)) {
+			return getList(ele, beanName);
+		}
+		else if (ele.getTagName().equals(SET_ELEMENT)) {
+			return getSet(ele, beanName);
+		}
+		else if (ele.getTagName().equals(MAP_ELEMENT)) {
+			return getMap(ele, beanName);
+		}
+		else if (ele.getTagName().equals(PROPS_ELEMENT)) {
+			return getProps(ele, beanName);
+		}
+		else if (ele.getTagName().equals(VALUE_ELEMENT)) {
+			return getTextValue(ele, beanName);
+		}
+		else if (ele.getTagName().equals(NULL_ELEMENT)) {
+			return null;
+		}
+		throw new BeanDefinitionStoreException(this.resource, beanName,"Unknown subelement of <property>: <" + ele.getTagName() + ">");
+	}
+	
+	protected List getList(Element collectionEle, String beanName) {
+		NodeList nl = collectionEle.getChildNodes();
+		ManagedList l = new ManagedList();
+		for (int i = 0; i < nl.getLength(); i++) {
+			if (nl.item(i) instanceof Element) {
+				Element ele = (Element) nl.item(i);
+				l.add(parsePropertySubelement(ele, beanName));
+			}
+		}
+		return l;
+	}
+	
+	protected Set getSet(Element collectionEle, String beanName) {
+		NodeList nl = collectionEle.getChildNodes();
+		ManagedSet s = new ManagedSet();
+		for (int i = 0; i < nl.getLength(); i++) {
+			if (nl.item(i) instanceof Element) {
+				Element ele = (Element) nl.item(i);
+				s.add(parsePropertySubelement(ele, beanName));
+			}
+		}
+		return s;
+	}
+	
+	protected Map getMap(Element mapEle, String beanName) {
+		ManagedMap m = new ManagedMap();
+		/*
+		 *<map>
+		 *	<entry key="">
+		 *		<value></value>
+		 *	<entry>
+		 *</map> 
+		*/
+		List l = getChildElementsByTagName(mapEle, ENTRY_ELEMENT);
+		for (int i = 0; i < l.size(); i++) {
+			Element entryEle = (Element) l.get(i);
+			String key = entryEle.getAttribute(KEY_ATTRIBUTE);
+			//entry 자식 노드 가져오기
+			NodeList subEles = entryEle.getElementsByTagName("*");
+			m.put(key, parsePropertySubelement((Element) subEles.item(0), beanName));
+		}
+		return m;
+	}
+	
+	protected List getChildElementsByTagName(Element mapEle, String elementName) {
+		NodeList nl = mapEle.getChildNodes();
+		List nodes = new ArrayList();
+		for (int i = 0; i < nl.getLength(); i++) {
+			Node n = nl.item(i);
+			if (n instanceof Element && elementName.equals(n.getNodeName())) {
+				nodes.add(n);
+			}
+		}
+		return nodes;
+	}
+	
+	protected Properties getProps(Element propsEle, String beanName) {
+		Properties props = new Properties();
+		NodeList nl = propsEle.getElementsByTagName(PROP_ELEMENT);
+		for (int i = 0; i < nl.getLength(); i++) {
+			Element propEle = (Element) nl.item(i);
+			String key = propEle.getAttribute(KEY_ATTRIBUTE);
+			String value = getTextValue(propEle, beanName).trim();
+			props.setProperty(key, value);
+		}
+		return props;
+	}
+	
+	protected String getTextValue(Element ele, String beanName) {
+		NodeList nl = ele.getChildNodes();
+		//자식 노드가 없으면 ""
+		if (nl.item(0) == null) {
+			return "";
+		}
+		
+		if (nl.getLength() != 1 || !(nl.item(0) instanceof Text)) {
+			throw new BeanDefinitionStoreException(this.resource, beanName,"Unexpected element or type mismatch: expected single node of " +
+					nl.item(0).getClass() + " to be of type Text: " + "found " + ele, null);
+		}
+		
+		Text t = (Text) nl.item(0);
+		return t.getData();
+	}
+	
+	protected int getDependencyCheck(String att) {
+		int dependencyCheckCode = RootBeanDefinition.DEPENDENCY_CHECK_NONE;
+		if (DEPENDENCY_CHECK_ALL_ATTRIBUTE_VALUE.equals(att)) {
+			dependencyCheckCode = RootBeanDefinition.DEPENDENCY_CHECK_ALL;
+		}
+		else if (DEPENDENCY_CHECK_SIMPLE_ATTRIBUTE_VALUE.equals(att)) {
+			dependencyCheckCode = RootBeanDefinition.DEPENDENCY_CHECK_SIMPLE;
+		}
+		else if (DEPENDENCY_CHECK_OBJECTS_ATTRIBUTE_VALUE.equals(att)) {
+			dependencyCheckCode = RootBeanDefinition.DEPENDENCY_CHECK_OBJECTS;
+		}
+		return dependencyCheckCode;
+	}
+
+	protected int getAutowireMode(String att) {
+		int autowire = RootBeanDefinition.AUTOWIRE_NO;
+		if (AUTOWIRE_BY_NAME_VALUE.equals(att)) {
+			autowire = RootBeanDefinition.AUTOWIRE_BY_NAME;
+		}
+		else if (AUTOWIRE_BY_TYPE_VALUE.equals(att)) {
+			autowire = RootBeanDefinition.AUTOWIRE_BY_TYPE;
+		}
+		else if (AUTOWIRE_CONSTRUCTOR_VALUE.equals(att)) {
+			autowire = RootBeanDefinition.AUTOWIRE_CONSTRUCTOR;
+		}
+		else if (AUTOWIRE_AUTODETECT_VALUE.equals(att)) {
+			autowire = RootBeanDefinition.AUTOWIRE_AUTODETECT;
+		}
+		return autowire;
 	}
 
 }
