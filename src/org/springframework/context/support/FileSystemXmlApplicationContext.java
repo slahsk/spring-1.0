@@ -30,6 +30,7 @@ public class FileSystemXmlApplicationContext extends AbstractXmlApplicationConte
 		return this.configLocations;
 	}
 	
+	//AbstractXmlApplicationContext하고 유일한 차이점이 이메소드 하나이다
 	protected Resource getResourceByPath(String path) {
 		if (path != null && path.startsWith("/")) {
 			path = path.substring(1);
